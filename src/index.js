@@ -1,21 +1,21 @@
-// src/app.js
+// src/index.js
 import "dotenv/config";
 import express from "express";
 import session from "express-session";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { connectDB } from "../db.js";
+import { connectDB } from "../db.js";             // db.js está en la raíz
 
-import authLocalRouter from "../routes/authLocal.js";
-import encuestasRouter from "../routes/encuestas.js";
-import respuestasRouter from "../routes/respuestas.js";
+import authLocalRouter from "./routes/authLocal.js";      // 👈 dentro de src
+import encuestasRouter from "./routes/encuestas.js";      // 👈 dentro de src
+import respuestasRouter from "./routes/respuestas.js";    // 👈 dentro de src
+
+// Conexión a Mongo (una sola vez en cold start)
+await connectDB(process.env.MONGODB_URI);
 
 const app = express();
 
-// ===== Conexión a Mongo (una vez) =====
-await connectDB(process.env.MONGODB_URI);
-
-// ===== CORS =====
+// CORS
 const ORIGIN = process.env.CLIENT_URL || "http://localhost:5173";
 app.use(cors({
   origin: ORIGIN,
@@ -25,18 +25,14 @@ app.use(cors({
 }));
 app.options("*", cors());
 
-// ===== Cookies / sesión =====
+// Cookies / sesión (MemoryStore funciona para pruebas; para prod: connect-mongo)
 app.use(cookieParser());
-
-// ⚠️ Si quieres sesiones persistentes en serverless,
-// cambia MemoryStore por connect-mongo. De momento preservo tu config.
 app.use(session({
   secret: process.env.SESSION_SECRET || "dev-secret",
   resave: false,
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    // En Vercel es cross-site: usa secure+none
     sameSite: process.env.VERCEL ? "none" : "lax",
     secure: !!process.env.VERCEL,
   }
@@ -44,13 +40,13 @@ app.use(session({
 
 app.use(express.json());
 
-// ===== Rutas =====
+// Rutas
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 app.use("/auth", authLocalRouter);
+// ❗️SIN prefijo /api aquí. Vercel ya antepone /api en producción.
+app.use("/encuestas",  encuestasRouter);
+app.use("/respuestas", respuestasRouter);
 
-// 👇 Quitar el prefijo /api aquí para evitar /api/api/... en Vercel
-app.use("/encuestas",   encuestasRouter);
-app.use("/respuestas",  respuestasRouter);
-
-export default app;
+export default app;          // 👈 importante
+// (sin app.listen aquí)
