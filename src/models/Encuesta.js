@@ -1,16 +1,16 @@
 import mongoose from "mongoose";
 
-const EncuestaSchema = new mongoose.Schema({
-  esPrueba: { type: Boolean, default: false },
-  tipo: { type: String, enum: ["USUARIO", "LOCAL"], required: true },
-  coordenadas: {
-    lat: Number,
-    lng: Number
+const EncuestaSchema = new mongoose.Schema(
+  {
+    tipo: { type: String, enum: ["usuario", "local"], required: true },
+    esPrueba: { type: Boolean, default: false },
+    coords: { lat: Number, lng: Number },       // opcional
+    encuestadorId: { type: Number },            // opcional (tu numericId de usuario)
+    inicio: { type: Date, default: Date.now },
+    fin: { type: Date }
   },
-  encuestadorId: { type: Number, required: true }, // ID del realizador (numérico)
-  usuario: { type: mongoose.Schema.Types.ObjectId, ref: "Usuario", default: null },
-  inicio: { type: Date, default: Date.now },
-  fin: { type: Date, default: null }
-}, { timestamps: true });
+  { timestamps: true }
+);
 
 export default mongoose.model("Encuesta", EncuestaSchema);
+
