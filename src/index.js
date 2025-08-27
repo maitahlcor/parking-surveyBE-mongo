@@ -4,7 +4,7 @@ import express from "express";
 import session from "express-session";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { connectDB } from "../db.js";
+import { connectDB } from "../db.js";            // db.js está en la raíz
 
 import authLocalRouter from "./routes/authLocal.js";
 import encuestasRouter from "./routes/encuestas.js";
@@ -12,29 +12,17 @@ import respuestasRouter from "./routes/respuestas.js";
 
 const app = express();
 
-// ---------- DB: singleton on-demand (evita fallar en cold start) ----------
-let dbReady = false;
-async function ensureDB() {
-  if (!dbReady) {
-    if (!process.env.MONGODB_URI) {
-      throw new Error("MONGODB_URI is not set");
-    }
-    await connectDB(process.env.MONGODB_URI);
-    dbReady = true;
-  }
-}
-
-// ---------- CORS ----------
+/* --------- CORS --------- */
 const ORIGIN = process.env.CLIENT_URL || "http://localhost:5173";
 app.use(cors({
   origin: ORIGIN,
   credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization"],
 }));
 app.options("*", cors());
 
-// ---------- Cookies / sesión ----------
+/* --------- Cookies / sesión --------- */
 app.use(cookieParser());
 app.use(session({
   secret: process.env.SESSION_SECRET || "dev-secret",
@@ -49,22 +37,29 @@ app.use(session({
 
 app.use(express.json());
 
-// ---------- Middleware para asegurar DB por request ----------
-app.use(async (req, res, next) => {
-  try {
-    await ensureDB();
-    next();
-  } catch (err) {
-    console.error("DB init error:", err);
+/* --------- Health (NO toca DB) --------- */
+app.get("/health", (_req, res) => res.json({ ok: true }));
+
+/* --------- Conexión a DB on-demand (SIN top-level await) --------- */
+let __dbReady = false;
+async function ensureDB() {
+  if (!__dbReady) {
+    if (!process.env.MONGODB_URI) throw new Error("MONGODB_URI missing");
+    await connectDB(process.env.MONGODB_URI);
+    __dbReady = true;
+  }
+}
+app.use(async (_req, res, next) => {
+  try { await ensureDB(); next(); }
+  catch (e) {
+    console.error("DB init error:", e?.message || e);
     res.status(500).json({ error: "DB connection failed" });
   }
 });
 
-// ---------- Rutas ----------
-app.get("/health", (_req, res) => res.json({ ok: true }));
+/* --------- Rutas (sin prefijo /api aquí) --------- */
+app.use("/auth",       authLocalRouter);
+app.use("/encuestas",  encuestasRouter);
+app.use("/respuestas", respuestasRouter);
 
-app.use("/auth", authLocalRouter);        // <- sin /api aquí
-app.use("/encuestas", encuestasRouter);   // <- sin /api aquí
-app.use("/respuestas", respuestasRouter); // <- sin /api aquí
-
-export default app;  // sin app.listen en Vercel
+export default app;     // <- SIN app.listen en Vercel
