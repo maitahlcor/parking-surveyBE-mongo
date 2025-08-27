@@ -12,23 +12,15 @@ import respuestasRouter from "./routes/respuestas.js";
 
 const app = express();
 
-/* ====== CORS (prod + dev) ====== */
-const allowedOrigins = [
-  process.env.CLIENT_URL,       // ej: https://parking-sruvey-fe.vercel.app
-  process.env.CLIENT_URL_DEV    // ej: http://localhost:5173
-].filter(Boolean);
-
-app.use(cors({
-  origin(origin, cb) {
-    if (!origin) return cb(null, true); // curl/Postman
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(new Error("Not allowed by CORS"), false);
-  },
+/* ====== CORS (permisivo y estable para navegador) ====== */
+const corsConfig = {
+  origin: true, // refleja el Origin que venga (Vercel/localhost)
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-}));
-app.options("*", cors());
+};
+app.use(cors(corsConfig));
+app.options("*", cors(corsConfig)); // preflight universal 204
 
 /* ====== Cookies / sesión ====== */
 const isProd = process.env.NODE_ENV === "production";
@@ -51,7 +43,7 @@ app.use(express.json());
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 /* ====== Rutas ====== */
-// OJO: Tu código original ya usa /api para estos recursos
+// OJO: tu backend ya expone /api para estos recursos
 app.use("/auth", authLocalRouter);
 app.use("/api/encuestas", encuestasRouter);
 app.use("/api/respuestas", respuestasRouter);
