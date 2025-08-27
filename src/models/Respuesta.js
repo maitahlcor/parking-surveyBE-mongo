@@ -1,3 +1,4 @@
+// src/models/Respuesta.js
 import mongoose from "mongoose";
 
 const RespuestaSchema = new mongoose.Schema(
@@ -8,26 +9,13 @@ const RespuestaSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-
-    // id de la pregunta en el JSON (ej: "q1")
     name: { type: String, required: true },
-
-    // texto de la pregunta (opcional)
     title: { type: String },
-
-    // tipo libre (sin enum)
-    type: { type: String, required: true },   // <--- sin enum
-
-    // puede ser string, number, array, objeto, etc.
+    type: { type: String, required: true },         // sin enum
     value: { type: mongoose.Schema.Types.Mixed, required: true },
-
-    // opcional para guardar metadatos (choices, min/max, etc.)
     meta: { type: mongoose.Schema.Types.Mixed },
   },
-  {
-    timestamps: { createdAt: true, updatedAt: false },
-    versionKey: false,
-  }
+  { timestamps: { createdAt: true, updatedAt: false }, versionKey: false }
 );
 
 export default mongoose.model("Respuesta", RespuestaSchema);

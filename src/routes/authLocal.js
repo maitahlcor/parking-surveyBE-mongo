@@ -1,57 +1,76 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import Usuario from "../models/Usuario.js";
 
 const router = Router();
-const JWT_SECRET = process.env.SESSION_SECRET || "dev-secret";
 
+// POST /auth/register
 router.post("/register", async (req, res) => {
   try {
     const { email, password } = req.body || {};
-    if (!email || !password) return res.status(400).json({ error: "Faltan campos" });
+    if (!email || !password) {
+      return res.status(400).json({ ok: false, error: "Email y contraseña son obligatorios" });
+    }
 
     const exists = await Usuario.findOne({ email });
-    if (exists) return res.status(409).json({ error: "Email ya registrado" });
+    if (exists) {
+      return res.status(409).json({ ok: false, error: "El correo ya existe" });
+    }
 
-    const hash = await bcrypt.hash(password, 10);
-    const u = await Usuario.create({ email, passwordHash: hash });
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await Usuario.create({ email, passwordHash });
 
-    res.json({ ok: true, id: u._id, email: u.email , numericId:u.numericId});
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "Error registrando" });
+    // si usas sesión:
+    req.session.userId = user._id.toString();
+
+    return res.status(201).json({ ok: true, id: user._id, email: user.email });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ ok: false, error: "No se pudo crear el usuario" });
   }
 });
 
+// POST /auth/login
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body || {};
-    if (!email || !password) return res.status(400).json({ error: "Faltan campos" });
+    if (!email || !password) {
+      return res.status(400).json({ ok: false, error: "Email y contraseña son obligatorios" });
+    }
 
-    const u = await Usuario.findOne({ email });
-    if (!u) return res.status(401).json({ error: "Credenciales" });
+    const user = await Usuario.findOne({ email });
+    if (!user) return res.status(401).json({ ok: false, error: "Credenciales inválidas" });
 
-    const ok = await bcrypt.compare(password, u.passwordHash || "");
-    if (!ok) return res.status(401).json({ error: "Credenciales" });
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) return res.status(401).json({ ok: false, error: "Credenciales inválidas" });
 
-    const token = jwt.sign({ uid: u._id, email: u.email }, JWT_SECRET, { expiresIn: "7d" });
-    res.cookie("token", token, { httpOnly: true, sameSite: "lax" });
-    res.json({ ok: true, user: { id: u._id, email: u.email }});
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "Error login" });
+    req.session.userId = user._id.toString();
+    return res.json({ ok: true, id: user._id, email: user.email });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ ok: false, error: "Error al iniciar sesión" });
   }
 });
 
-router.post("/logout", (req, res) => {
-  res.clearCookie("token");
-  res.json({ ok: true });
+// GET /auth/me
+router.get("/me", async (req, res) => {
+  try {
+    if (!req.session?.userId) {
+      return res.status(401).json({ ok: false });
+    }
+    const user = await Usuario.findById(req.session.userId).select("email numericId");
+    if (!user) return res.status(401).json({ ok: false });
+    return res.json({ ok: true, id: user._id, email: user.email, numericId: user.numericId });
+  } catch {
+    return res.status(500).json({ ok: false, error: "Error" });
+  }
 });
 
-router.get("/me", async (req, res) => {
-  // opcional: validar JWT de cookie y devolver usuario
-  res.json({ ok: true });
+// POST /auth/logout
+router.post("/logout", (req, res) => {
+  req.session?.destroy?.(() => {});
+  res.clearCookie("connect.sid"); // nombre por defecto de express-session
+  res.status(204).end();
 });
 
 export default router;
