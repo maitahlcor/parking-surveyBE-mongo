@@ -2,5 +2,5 @@
 import app from "../src/index.js";
 
 export default function handler(req, res) {
-  return app(req, res);   // Express maneja /api y /api/*
+  return app(req, res);
 }
