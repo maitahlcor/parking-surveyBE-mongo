@@ -1,3 +1,4 @@
+// src/routes/encuestas.js (ESM)
 import { Router } from "express";
 import Encuesta from "../models/Encuesta.js";
 
@@ -7,18 +8,18 @@ function toGeo(body, prefix = "") {
   const lat = body?.lat ?? body?.[`${prefix}lat`];
   const lng = body?.lng ?? body?.[`${prefix}lng`];
   if (typeof lat === "number" && typeof lng === "number") {
-    return { type: "Point", coordinates: [lng, lat] };
+    return { type: "Point", coordinates: [lng, lat] }; // GeoJSON [lng, lat]
   }
   return undefined;
 }
 
-// POST /encuestas/start
+// POST /api/encuestas/start
 router.post("/start", async (req, res) => {
   try {
     const { tipo } = req.body;
     if (!tipo) return res.status(400).json({ error: "tipo es requerido" });
 
-    const createdBy = req.user?._id || req.body.createdBy || null; // ajusta a tu auth
+    const createdBy = req.user?._id || req.body.createdBy || null; // ajusta a tu auth real
 
     const encuesta = new Encuesta({
       tipo,
@@ -30,12 +31,12 @@ router.post("/start", async (req, res) => {
     await encuesta.save();
     res.status(201).json(encuesta);
   } catch (e) {
-    console.error(e);
+    console.error("Error start:", e);
     res.status(500).json({ error: "No se pudo iniciar la encuesta" });
   }
 });
 
-// PUT /encuestas/:id/finalizar
+// PUT /api/encuestas/:id/finalizar
 router.put("/:id/finalizar", async (req, res) => {
   try {
     const { id } = req.params;
@@ -54,9 +55,10 @@ router.put("/:id/finalizar", async (req, res) => {
 
     const encuesta = await Encuesta.findByIdAndUpdate(id, update, { new: true });
     if (!encuesta) return res.status(404).json({ error: "Encuesta no encontrada" });
+
     res.json(encuesta);
   } catch (e) {
-    console.error(e);
+    console.error("Error finalizar:", e);
     res.status(500).json({ error: "No se pudo finalizar la encuesta" });
   }
 });
