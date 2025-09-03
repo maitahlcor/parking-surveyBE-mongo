@@ -16,13 +16,15 @@ function toGeo(body, prefix = "") {
 // POST /api/encuestas/start
 router.post("/start", async (req, res) => {
   try {
-    const { tipo } = req.body;
+    const { tipo, subtipo } = req.body; // 👈 leer subtipo
     if (!tipo) return res.status(400).json({ error: "tipo es requerido" });
 
-    const createdBy = req.user?._id || req.body.createdBy || null;
+    const createdBy =
+      req.user?._id || req.session?.user?._id || req.body.createdBy || null;
 
     const encuesta = new Encuesta({
-      tipo,
+      tipo,            // "usuarios" | "locales"
+      subtipo,         // 👈 "Residencial", "Comercio/...", etc.
       createdBy,
       startedAt: new Date(),
       coordsStart: toGeo(req.body, "start."),
