@@ -1,3 +1,4 @@
+// src/models/Encuesta.js
 import mongoose from "mongoose";
 
 const RespuestaSchema = new mongoose.Schema(
@@ -14,8 +15,7 @@ const RespuestaSchema = new mongoose.Schema(
 const GeoPointSchema = new mongoose.Schema(
   {
     type: { type: String, enum: ["Point"], default: "Point" },
-    // GeoJSON: [lng, lat]
-    coordinates: { type: [Number], required: true },
+    coordinates: { type: [Number] }, // [lng, lat]
   },
   { _id: false }
 );
@@ -23,12 +23,12 @@ const GeoPointSchema = new mongoose.Schema(
 const EncuestaSchema = new mongoose.Schema(
   {
     tipo: { type: String, enum: ["usuarios", "locales"], required: true },
-    respuestas: [RespuestaSchema],
+    respuestas: { type: [RespuestaSchema], default: [] },   // <<--- importante
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     startedAt: { type: Date },
     finishedAt: { type: Date },
-    coordsStart: GeoPointSchema,
-    coordsEnd: GeoPointSchema,
+    coordsStart: { type: GeoPointSchema, default: undefined },
+    coordsEnd: { type: GeoPointSchema, default: undefined },
   },
   { timestamps: true }
 );

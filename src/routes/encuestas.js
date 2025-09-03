@@ -1,4 +1,4 @@
-// src/routes/encuestas.js (ESM)
+// src/routes/encuestas.js
 import { Router } from "express";
 import Encuesta from "../models/Encuesta.js";
 
@@ -19,7 +19,7 @@ router.post("/start", async (req, res) => {
     const { tipo } = req.body;
     if (!tipo) return res.status(400).json({ error: "tipo es requerido" });
 
-    const createdBy = req.user?._id || req.body.createdBy || null; // ajusta a tu auth real
+    const createdBy = req.user?._id || req.body.createdBy || null;
 
     const encuesta = new Encuesta({
       tipo,
@@ -31,7 +31,7 @@ router.post("/start", async (req, res) => {
     await encuesta.save();
     res.status(201).json(encuesta);
   } catch (e) {
-    console.error("Error start:", e);
+    console.error("Error start encuesta:", e);
     res.status(500).json({ error: "No se pudo iniciar la encuesta" });
   }
 });
@@ -42,23 +42,22 @@ router.put("/:id/finalizar", async (req, res) => {
     const { id } = req.params;
     const { respuestas = [], finishedAt } = req.body;
 
-    const respuestasConId = (Array.isArray(respuestas) ? respuestas : []).map((r) => ({
-      ...r,
-      encuestaId: id,
-    }));
-
-    const update = {
-      finishedAt: finishedAt ? new Date(finishedAt) : new Date(),
-      coordsEnd: toGeo(req.body, "end."),
-      $push: { respuestas: { $each: respuestasConId } },
-    };
-
-    const encuesta = await Encuesta.findByIdAndUpdate(id, update, { new: true });
+    const encuesta = await Encuesta.findById(id);
     if (!encuesta) return res.status(404).json({ error: "Encuesta no encontrada" });
 
+    // inyecta encuestaId y acumula respuestas
+    for (const r of Array.isArray(respuestas) ? respuestas : []) {
+      encuesta.respuestas.push({ ...r, encuestaId: id });
+    }
+
+    encuesta.finishedAt = finishedAt ? new Date(finishedAt) : new Date();
+    const geoEnd = toGeo(req.body, "end.");
+    if (geoEnd) encuesta.coordsEnd = geoEnd;
+
+    await encuesta.save(); // <<--- guarda todo
     res.json(encuesta);
   } catch (e) {
-    console.error("Error finalizar:", e);
+    console.error("Error finalizar encuesta:", e);
     res.status(500).json({ error: "No se pudo finalizar la encuesta" });
   }
 });
