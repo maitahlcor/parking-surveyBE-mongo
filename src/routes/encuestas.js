@@ -5,13 +5,14 @@ import Encuesta from "../models/Encuesta.js";
 const router = Router();
 
 function toGeo(body, prefix = "") {
-  const lat = body?.lat ?? body?.[`${prefix}lat`];
-  const lng = body?.lng ?? body?.[`${prefix}lng`];
-  if (typeof lat === "number" && typeof lng === "number") {
-    return { type: "Point", coordinates: [lng, lat] }; // GeoJSON [lng, lat]
-  }
-  return undefined;
+  const lat = body?.[`${prefix}lat`] ?? body?.lat;
+  const lng = body?.[`${prefix}lng`] ?? body?.lng;
+  if (lat == null || lng == null) return undefined;
+  const nlat = Number(lat), nlng = Number(lng);
+  if (!Number.isFinite(nlat) || !Number.isFinite(nlng)) return undefined;
+  return { type: "Point", coordinates: [nlng, nlat] };
 }
+
 
 // POST /api/encuestas/start
 router.post("/start", async (req, res) => {
@@ -20,7 +21,12 @@ router.post("/start", async (req, res) => {
     if (!tipo) return res.status(400).json({ error: "tipo es requerido" });
 
     const createdBy =
-      req.user?._id || req.session?.user?._id || req.body.createdBy || null;
+      req.user?._id ||
+      req.session?.userId ||          // 👈 importante
+      req.session?.user?._id ||
+      req.body.createdBy ||
+      null;
+
 
     const encuesta = new Encuesta({
       tipo,            // "usuarios" | "locales"
@@ -41,27 +47,67 @@ router.post("/start", async (req, res) => {
 // PUT /api/encuestas/:id/finalizar
 router.put("/:id/finalizar", async (req, res) => {
   try {
-    const { id } = req.params;
-    const { respuestas = [], finishedAt } = req.body;
+    const {
+      respuestas = [],
+      finishedAt,
+      "end.lat": endLat,
+      "end.lng": endLng,
+      answeredCount,
+      code,
+    } = req.body;
 
-    const encuesta = await Encuesta.findById(id);
-    if (!encuesta) return res.status(404).json({ error: "Encuesta no encontrada" });
+    const doc = await Encuesta.findById(req.params.id);
+    if (!doc) return res.status(404).json({ ok: false, error: "not found" });
 
-    // inyecta encuestaId y acumula respuestas
-    for (const r of Array.isArray(respuestas) ? respuestas : []) {
-      encuesta.respuestas.push({ ...r, encuestaId: id });
+    if (Array.isArray(respuestas) && respuestas.length) {
+      const items = respuestas.map(r => ({ ...r, encuestaId: doc._id }));
+      doc.respuestas.push(...items);
     }
 
-    encuesta.finishedAt = finishedAt ? new Date(finishedAt) : new Date();
-    const geoEnd = toGeo(req.body, "end.");
-    if (geoEnd) encuesta.coordsEnd = geoEnd;
+    if (finishedAt) doc.finishedAt = new Date(finishedAt);
+    if (endLat != null && endLng != null) {
+      const nlat = Number(endLat), nlng = Number(endLng);
+      if (Number.isFinite(nlat) && Number.isFinite(nlng)) {
+        doc.coordsEnd = { type: "Point", coordinates: [nlng, nlat] };
+      }
+    }
 
-    await encuesta.save(); // <<--- guarda todo
-    res.json(encuesta);
-  } catch (e) {
-    console.error("Error finalizar encuesta:", e);
-    res.status(500).json({ error: "No se pudo finalizar la encuesta" });
+    // --- NUEVO: fallback ---
+    if (typeof answeredCount === "number") {
+      doc.answeredCount = answeredCount;
+    } else {
+      // cuenta únicas con valor no vacío (ignora metas si las hubiera)
+      const count = new Set(
+        (doc.respuestas || [])
+          .filter(r => r?.name && r.value !== undefined && r.value !== "")
+          .map(r => String(r.name))
+      ).size;
+      doc.answeredCount = count;
+    }
+
+    if (code) {
+      doc.code = String(code);
+    } else if (!doc.code) {
+      // genera uno si no vino
+      const kind = doc.tipo === "usuarios" ? "USR" : "LOC";
+      const short = (doc.subtipo || "GEN").split(/[\/\s\+]/)[0].slice(0,4).toUpperCase();
+      const ts = Math.floor(Date.now() / 1000); // segundos
+      doc.code = `${kind}-${short}-${ts}`;
+    }
+
+    await doc.save();
+
+    return res.json({
+      ok: true,
+      id: doc._id,
+      code: doc.code,
+      answeredCount: doc.answeredCount,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ ok: false, error: "server_error" });
   }
 });
+
 
 export default router;

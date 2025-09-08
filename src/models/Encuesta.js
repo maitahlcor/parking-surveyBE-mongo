@@ -23,7 +23,12 @@ const GeoPointSchema = new mongoose.Schema(
 const EncuestaSchema = new mongoose.Schema(
   {
     tipo: { type: String, enum: ["usuarios", "locales"], required: true },
-    subtipo: { type: String }, // 👈 NUEVO: Residencial, Comercio/..., etc.
+
+    // NUEVOS CAMPOS 👇
+    subtipo: { type: String },                 // p.ej. "Residencial"
+    code: { type: String, index: true },       // si quieres, usa unique: true
+    answeredCount: { type: Number, default: 0 },
+
     respuestas: { type: [RespuestaSchema], default: [] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     startedAt: { type: Date },
@@ -36,7 +41,5 @@ const EncuestaSchema = new mongoose.Schema(
 
 EncuestaSchema.index({ coordsStart: "2dsphere" });
 EncuestaSchema.index({ coordsEnd: "2dsphere" });
-EncuestaSchema.index({ tipo: 1, subtipo: 1 });           // 👈 útil para filtrar
-EncuestaSchema.index({ createdBy: 1, startedAt: -1 });   // 👈 útil para listados
 
 export default mongoose.model("Encuesta", EncuestaSchema);
