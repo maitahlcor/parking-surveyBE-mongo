@@ -17,7 +17,7 @@ function toGeo(body, prefix = "") {
 // POST /api/encuestas/start
 router.post("/start", async (req, res) => {
   try {
-    const { tipo, subtipo } = req.body; // 👈 leer subtipo
+    const { tipo, subtipo, isTest, esPrueba } = req.body;
     if (!tipo) return res.status(400).json({ error: "tipo es requerido" });
 
     const createdBy =
@@ -32,6 +32,8 @@ router.post("/start", async (req, res) => {
       tipo,            // "usuarios" | "locales"
       subtipo,         // 👈 "Residencial", "Comercio/...", etc.
       createdBy,
+      isTest: typeof isTest === "boolean" ? isTest :
+              typeof esPrueba === "boolean" ? esPrueba : undefined,
       startedAt: new Date(),
       coordsStart: toGeo(req.body, "start."),
     });
@@ -52,6 +54,8 @@ router.put("/:id/finalizar", async (req, res) => {
       finishedAt,
       "end.lat": endLat,
       "end.lng": endLng,
+      isTest,
+      esPrueba,
       answeredCount,
       code,
     } = req.body;
@@ -96,12 +100,18 @@ router.put("/:id/finalizar", async (req, res) => {
     }
 
     await doc.save();
-
+     // ✅ guardar bandera de prueba (acepta isTest o esPrueba)
+    if (typeof isTest === "boolean") {
+      doc.isTest = isTest;
+    } else if (typeof esPrueba === "boolean") {
+      doc.isTest = esPrueba;
+    }
     return res.json({
       ok: true,
       id: doc._id,
       code: doc.code,
       answeredCount: doc.answeredCount,
+      isTest: doc.isTest,
     });
   } catch (err) {
     console.error(err);

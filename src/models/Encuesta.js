@@ -28,7 +28,7 @@ const EncuestaSchema = new mongoose.Schema(
     subtipo: { type: String },                 // p.ej. "Residencial"
     code: { type: String, index: true },       // si quieres, usa unique: true
     answeredCount: { type: Number, default: 0 },
-
+    isTest: { type: Boolean, default: null },   // 👈 nuevo (true/false o null)
     respuestas: { type: [RespuestaSchema], default: [] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     startedAt: { type: Date },
