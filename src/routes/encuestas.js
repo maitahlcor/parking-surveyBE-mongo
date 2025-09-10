@@ -13,27 +13,55 @@ function toGeo(body, prefix = "") {
   return { type: "Point", coordinates: [nlng, nlat] };
 }
 
+// Normaliza "empresa encuestadora" a uno de los tres valores permitidos
+function normalizeEmpresa(v) {
+  const s = (v ?? "").toString().trim();
+  if (!s) return null;
+  if (/^mj$/i.test(s)) return "MJ";
+  if (/^(c\s*&\s*a|c&a)$/i.test(s)) return "C&A";
+  if (/^global$/i.test(s)) return "Global";
+  return null;
+}
 
 // POST /api/encuestas/start
 router.post("/start", async (req, res) => {
   try {
-    const { tipo, subtipo, isTest, esPrueba } = req.body;
+    const { tipo, subtipo } = req.body;
     if (!tipo) return res.status(400).json({ error: "tipo es requerido" });
+
+    // leer y normalizar flags/metas
+    const empresaRaw =
+      req.body.empresaEncuestadora ??
+      req.body.empresa ??
+      req.body.encuestadora;
+
+    const empresa = normalizeEmpresa(empresaRaw);
+    if (!empresa) {
+      return res
+        .status(400)
+        .json({ error: "empresaEncuestadora inválida o faltante (MJ | C&A | Global)" });
+    }
+
+    const isTest =
+      req.body.isTest === true
+        ? true
+        : req.body.esPrueba === true
+        ? true
+        : false; // nunca null/undefined
 
     const createdBy =
       req.user?._id ||
-      req.session?.userId ||          // 👈 importante
+      req.session?.userId ||
       req.session?.user?._id ||
       req.body.createdBy ||
       null;
 
-
     const encuesta = new Encuesta({
-      tipo,            // "usuarios" | "locales"
-      subtipo,         // 👈 "Residencial", "Comercio/...", etc.
+      tipo,                // "usuarios" | "locales"
+      subtipo,             // "Residencial", "Comercio/Establecimiento", etc.
       createdBy,
-      isTest: typeof isTest === "boolean" ? isTest :
-              typeof esPrueba === "boolean" ? esPrueba : undefined,
+      empresaEncuestadora: empresa,   // <-- guardamos empresa
+      isTest,                         // <-- boolean garantizado
       startedAt: new Date(),
       coordsStart: toGeo(req.body, "start."),
     });
@@ -58,16 +86,21 @@ router.put("/:id/finalizar", async (req, res) => {
       esPrueba,
       answeredCount,
       code,
+      empresaEncuestadora,   // puede venir en finalizar (reconfirmación)
+      empresa,               // alias opcional
+      encuestadora           // alias opcional
     } = req.body;
 
     const doc = await Encuesta.findById(req.params.id);
     if (!doc) return res.status(404).json({ ok: false, error: "not found" });
 
+    // agregar respuestas (si llegan)
     if (Array.isArray(respuestas) && respuestas.length) {
       const items = respuestas.map(r => ({ ...r, encuestaId: doc._id }));
       doc.respuestas.push(...items);
     }
 
+    // tiempos y coords final
     if (finishedAt) doc.finishedAt = new Date(finishedAt);
     if (endLat != null && endLng != null) {
       const nlat = Number(endLat), nlng = Number(endLng);
@@ -76,11 +109,10 @@ router.put("/:id/finalizar", async (req, res) => {
       }
     }
 
-    // --- NUEVO: fallback ---
+    // answeredCount: usa el provisto o calcula
     if (typeof answeredCount === "number") {
       doc.answeredCount = answeredCount;
     } else {
-      // cuenta únicas con valor no vacío (ignora metas si las hubiera)
       const count = new Set(
         (doc.respuestas || [])
           .filter(r => r?.name && r.value !== undefined && r.value !== "")
@@ -89,35 +121,43 @@ router.put("/:id/finalizar", async (req, res) => {
       doc.answeredCount = count;
     }
 
+    // code: usa el provisto o genera si no existía
     if (code) {
       doc.code = String(code);
     } else if (!doc.code) {
-      // genera uno si no vino
       const kind = doc.tipo === "usuarios" ? "USR" : "LOC";
-      const short = (doc.subtipo || "GEN").split(/[\/\s\+]/)[0].slice(0,4).toUpperCase();
+      const short = (doc.subtipo || "GEN").split(/[\/\s\+]/)[0].slice(0, 4).toUpperCase();
       const ts = Math.floor(Date.now() / 1000); // segundos
       doc.code = `${kind}-${short}-${ts}`;
     }
 
-    await doc.save();
-     // ✅ guardar bandera de prueba (acepta isTest o esPrueba)
+    // bandera de prueba (acepta isTest o esPrueba) → siempre boolean
     if (typeof isTest === "boolean") {
       doc.isTest = isTest;
     } else if (typeof esPrueba === "boolean") {
       doc.isTest = esPrueba;
+    } // si no vino, no lo toques (se mantiene lo de /start)
+
+    // empresa: si llega válida, actualiza (por si quieres rectificar en finalizar)
+    const empresaIn = normalizeEmpresa(empresaEncuestadora ?? empresa ?? encuestadora);
+    if (empresaIn) {
+      doc.empresaEncuestadora = empresaIn;
     }
+
+    await doc.save();
+
     return res.json({
       ok: true,
       id: doc._id,
       code: doc.code,
       answeredCount: doc.answeredCount,
       isTest: doc.isTest,
+      empresaEncuestadora: doc.empresaEncuestadora,
     });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ ok: false, error: "server_error" });
   }
 });
-
 
 export default router;
