@@ -43,7 +43,7 @@ app.use(express.json());
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 /* ====== Rutas ====== */
-// OJO: tu backend ya expone /api para estos recursos
+app.use("/api/auth", authLocalRouter);
 app.use("/auth", authLocalRouter);
 app.use("/api/encuestas", encuestasRouter);
 app.use("/api/respuestas", respuestasRouter);
