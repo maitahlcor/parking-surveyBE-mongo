@@ -14,6 +14,18 @@ function toGeo(body, prefix = "") {
 }
 
 // Normaliza "empresa encuestadora" a uno de los tres valores permitidos
+function normalizeTipo(v) {
+  const key = (v ?? "")
+    .toString()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, "");
+  if (key === "usuarios") return "usuarios";
+  if (key === "locales" || key === "transportepublico") return "locales";
+  return null;
+}
+
 function normalizeEmpresa(v) {
   const s = (v ?? "").toString().trim();
   if (!s) return null;
@@ -26,8 +38,13 @@ function normalizeEmpresa(v) {
 // POST /api/encuestas/start
 router.post("/start", async (req, res) => {
   try {
-    const { tipo, subtipo } = req.body;
-    if (!tipo) return res.status(400).json({ error: "tipo es requerido" });
+    const tipo = normalizeTipo(req.body.tipo);
+    const { subtipo } = req.body;
+    if (!tipo) {
+      return res.status(400).json({
+        error: "tipo es requerido (usuarios | locales | TransportePublico)",
+      });
+    }
 
     // leer y normalizar flags/metas
     const empresaRaw =
@@ -49,12 +66,15 @@ router.post("/start", async (req, res) => {
         ? true
         : false; // nunca null/undefined
 
-    const createdBy =
+    const createdByRaw =
       req.user?._id ||
       req.session?.userId ||
       req.session?.user?._id ||
       req.body.createdBy ||
       null;
+    const createdBy = /^[a-fA-F0-9]{24}$/.test(String(createdByRaw || ""))
+      ? String(createdByRaw)
+      : null;
 
     const encuesta = new Encuesta({
       tipo,                // "usuarios" | "locales"

@@ -22,7 +22,11 @@ const GeoPointSchema = new mongoose.Schema(
 
 const EncuestaSchema = new mongoose.Schema(
   {
-    tipo: { type: String, enum: ["usuarios", "locales"], required: true },
+    tipo: {
+      type: String,
+      enum: ["usuarios", "locales", "TransportePublico"],
+      required: true,
+    },
 
     // NUEVOS CAMPOS 👇
     subtipo: { type: String },                 // p.ej. "Residencial"
