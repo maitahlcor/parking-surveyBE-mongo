@@ -35,6 +35,26 @@ function normalizeEmpresa(v) {
   return null;
 }
 
+// GET /api/encuestas/export — JSON de toda la colección
+router.get("/export", async (req, res) => {
+  try {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+    const docs = await Encuesta.find({}).lean();
+    const day = new Date().toISOString().slice(0, 10);
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="encuestas-${day}.json"`
+    );
+    return res.json(docs);
+  } catch (e) {
+    console.error("Error export encuestas:", e);
+    return res.status(500).json({ error: "No se pudo exportar" });
+  }
+});
+
 // POST /api/encuestas/start
 router.post("/start", async (req, res) => {
   try {
