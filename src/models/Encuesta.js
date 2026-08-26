@@ -24,7 +24,7 @@ const EncuestaSchema = new mongoose.Schema(
   {
     tipo: {
       type: String,
-      enum: ["usuarios", "locales", "TransportePublico"],
+      enum: ["usuarios", "locales", "TransportePublico", "PRPD_uraba"],
       required: true,
     },
 

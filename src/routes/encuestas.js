@@ -23,6 +23,7 @@ function normalizeTipo(v) {
     .replace(/\s+/g, "");
   if (key === "usuarios") return "usuarios";
   if (key === "locales" || key === "transportepublico") return "locales";
+  if (key === "prpd_uraba" || key === "prpduraba") return "PRPD_uraba";
   return null;
 }
 
@@ -62,7 +63,7 @@ router.post("/start", async (req, res) => {
     const { subtipo } = req.body;
     if (!tipo) {
       return res.status(400).json({
-        error: "tipo es requerido (usuarios | locales | TransportePublico)",
+        error: "tipo es requerido (usuarios | locales | TransportePublico | PRPD_uraba)",
       });
     }
 
