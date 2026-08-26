@@ -8,6 +8,8 @@ const RespuestaSchema = new mongoose.Schema(
     title: String,
     type: String,
     value: mongoose.Schema.Types.Mixed,
+    invertido: { type: Boolean },
+    value_raw: { type: mongoose.Schema.Types.Mixed },
   },
   { _id: false }
 );

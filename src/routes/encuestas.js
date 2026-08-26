@@ -27,6 +27,33 @@ function normalizeTipo(v) {
   return null;
 }
 
+function mergeRespuestas(existing, incoming, encuestaId) {
+  const byName = new Map();
+  for (const r of existing || []) {
+    if (r?.name) byName.set(String(r.name), r);
+  }
+  for (const r of incoming || []) {
+    if (!r?.name) continue;
+    byName.set(String(r.name), { ...r, encuestaId });
+  }
+  return Array.from(byName.values());
+}
+
+function uniqueAnsweredCount(respuestas = []) {
+  const set = new Set();
+  for (const r of respuestas) {
+    const name = String(r?.name || "");
+    if (!name) continue;
+    if (name.startsWith("escenario:")) {
+      const parts = name.split(":");
+      set.add(`${parts[0]}:${parts[1] || ""}`);
+    } else {
+      set.add(name.split(":")[0]);
+    }
+  }
+  return set.size;
+}
+
 function normalizeEmpresa(v) {
   const s = (v ?? "").toString().trim();
   if (!s) return null;
@@ -135,10 +162,8 @@ router.put("/:id/finalizar", async (req, res) => {
     const doc = await Encuesta.findById(req.params.id);
     if (!doc) return res.status(404).json({ ok: false, error: "not found" });
 
-    // agregar respuestas (si llegan)
     if (Array.isArray(respuestas) && respuestas.length) {
-      const items = respuestas.map(r => ({ ...r, encuestaId: doc._id }));
-      doc.respuestas.push(...items);
+      doc.respuestas = respuestas.map((r) => ({ ...r, encuestaId: doc._id }));
     }
 
     // tiempos y coords final
@@ -154,12 +179,7 @@ router.put("/:id/finalizar", async (req, res) => {
     if (typeof answeredCount === "number") {
       doc.answeredCount = answeredCount;
     } else {
-      const count = new Set(
-        (doc.respuestas || [])
-          .filter(r => r?.name && r.value !== undefined && r.value !== "")
-          .map(r => String(r.name))
-      ).size;
-      doc.answeredCount = count;
+      doc.answeredCount = uniqueAnsweredCount(doc.respuestas);
     }
 
     // code: usa el provisto o genera si no existía
@@ -194,6 +214,29 @@ router.put("/:id/finalizar", async (req, res) => {
       answeredCount: doc.answeredCount,
       isTest: doc.isTest,
       empresaEncuestadora: doc.empresaEncuestadora,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ ok: false, error: "server_error" });
+  }
+});
+
+// PATCH /api/encuestas/:id/respuestas — upsert parcial por name
+router.patch("/:id/respuestas", async (req, res) => {
+  try {
+    const doc = await Encuesta.findById(req.params.id);
+    if (!doc) return res.status(404).json({ ok: false, error: "not found" });
+    const respuestas = Array.isArray(req.body?.respuestas) ? req.body.respuestas : [];
+    if (respuestas.length) {
+      doc.respuestas = mergeRespuestas(doc.respuestas, respuestas, doc._id);
+      doc.answeredCount = uniqueAnsweredCount(doc.respuestas);
+    }
+    await doc.save();
+    return res.json({
+      ok: true,
+      id: doc._id,
+      answeredCount: doc.answeredCount,
+      n_respuestas: (doc.respuestas || []).length,
     });
   } catch (err) {
     console.error(err);
