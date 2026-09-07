@@ -5,6 +5,11 @@ const UsuarioSchema = new mongoose.Schema({
   email: { type: String, unique: true, required: true, index: true },
   passwordHash: { type: String, required: true },     // <- REQUERIDO
   numericId: { type: Number, unique: true, index: true },
+  role: {
+    type: String,
+    enum: ["encuestador", "seguimiento"],
+    default: "encuestador",
+  },
   createdAt: { type: Date, default: Date.now }
 });
 

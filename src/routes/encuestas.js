@@ -1,6 +1,7 @@
 // src/routes/encuestas.js
 import { Router } from "express";
 import Encuesta from "../models/Encuesta.js";
+import Usuario from "../models/Usuario.js";
 
 const router = Router();
 
@@ -80,6 +81,141 @@ router.get("/export", async (req, res) => {
   } catch (e) {
     console.error("Error export encuestas:", e);
     return res.status(500).json({ error: "No se pudo exportar" });
+  }
+});
+
+function rangoDiaBogota(fecha) {
+  const day =
+    fecha && /^\d{4}-\d{2}-\d{2}$/.test(String(fecha))
+      ? String(fecha)
+      : new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+  const start = new Date(`${day}T00:00:00-05:00`);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { day, start, end };
+}
+
+function pairFromGeo(geo) {
+  const coords = geo?.coordinates;
+  if (!Array.isArray(coords) || coords.length < 2) return null;
+  const lng = Number(coords[0]);
+  const lat = Number(coords[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+
+function cedulaFrom(doc) {
+  const hit = (doc.respuestas || []).find((r) => r?.name === "cc_encuestador");
+  return hit?.value != null && String(hit.value).trim()
+    ? String(hit.value).trim()
+    : null;
+}
+
+function horaBogota(value) {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const part = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Bogota",
+    hour: "2-digit",
+    hourCycle: "h23",
+  })
+    .formatToParts(d)
+    .find((p) => p.type === "hour");
+  const hora = Number(part?.value);
+  return Number.isFinite(hora) ? hora : null;
+}
+
+function momentoEnvio(doc) {
+  return doc.finishedAt || doc.startedAt || doc.createdAt || null;
+}
+
+// GET /api/encuestas/seguimiento — totales + puntos GPS del día (rol seguimiento)
+router.get("/seguimiento", async (req, res) => {
+  try {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+    const user = await Usuario.findById(req.session.userId).select("email role");
+    if (!user) return res.status(401).json({ error: "No autenticado" });
+    if ((user.role || "encuestador") !== "seguimiento") {
+      return res.status(403).json({ error: "Sin permiso de seguimiento" });
+    }
+
+    const { day, start, end } = rangoDiaBogota(req.query.fecha);
+    const filtro = {
+      $or: [
+        { createdAt: { $gte: start, $lt: end } },
+        { finishedAt: { $gte: start, $lt: end } },
+        { startedAt: { $gte: start, $lt: end } },
+      ],
+    };
+    const docs = await Encuesta.find(filtro).lean();
+
+    const puntos = [];
+    const porTipo = {};
+    const porCedula = {};
+    let finalizadas = 0;
+    let conGps = 0;
+    let isTest = 0;
+
+    for (const doc of docs) {
+      const tipo = String(doc.tipo || "otro");
+      porTipo[tipo] = (porTipo[tipo] || 0) + 1;
+      const cerrada = !!doc.finishedAt;
+      const prueba = doc.isTest === true;
+      if (cerrada) finalizadas += 1;
+      if (prueba) isTest += 1;
+
+      const cedula = cedulaFrom(doc) || "(sin cédula)";
+      if (!porCedula[cedula]) {
+        porCedula[cedula] = {
+          cedula,
+          total: 0,
+          abiertas: 0,
+          finalizadas: 0,
+          prueba: 0,
+        };
+      }
+      porCedula[cedula].total += 1;
+      if (cerrada) porCedula[cedula].finalizadas += 1;
+      else porCedula[cedula].abiertas += 1;
+      if (prueba) porCedula[cedula].prueba += 1;
+
+      const geo = pairFromGeo(doc.coordsEnd) || pairFromGeo(doc.coordsStart);
+      if (!geo) continue;
+      conGps += 1;
+      const enviada = momentoEnvio(doc);
+      puntos.push({
+        id: String(doc._id),
+        code: doc.code || null,
+        tipo,
+        isTest: prueba,
+        finalizada: cerrada,
+        cedula: cedulaFrom(doc),
+        hora: horaBogota(enviada),
+        enviada_at: enviada ? new Date(enviada).toISOString() : null,
+        lat: geo.lat,
+        lng: geo.lng,
+      });
+    }
+
+    const tabla_cedula = Object.values(porCedula).sort((a, b) => b.total - a.total);
+
+    return res.json({
+      ok: true,
+      fecha: day,
+      total: docs.length,
+      finalizadas,
+      abiertas: docs.length - finalizadas,
+      con_gps: conGps,
+      isTest,
+      por_tipo: porTipo,
+      tabla_cedula,
+      puntos,
+    });
+  } catch (e) {
+    console.error("Error seguimiento:", e);
+    return res.status(500).json({ error: "No se pudo leer el seguimiento" });
   }
 });
 

@@ -23,7 +23,12 @@ router.post("/register", async (req, res) => {
     // si usas sesión:
     req.session.userId = user._id.toString();
 
-    return res.status(201).json({ ok: true, id: user._id, email: user.email });
+    return res.status(201).json({
+      ok: true,
+      id: user._id,
+      email: user.email,
+      role: user.role || "encuestador",
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ ok: false, error: "No se pudo crear el usuario" });
@@ -45,7 +50,12 @@ router.post("/login", async (req, res) => {
     if (!ok) return res.status(401).json({ ok: false, error: "Credenciales inválidas" });
 
     req.session.userId = user._id.toString();
-    return res.json({ ok: true, id: user._id, email: user.email });
+    return res.json({
+      ok: true,
+      id: user._id,
+      email: user.email,
+      role: user.role || "encuestador",
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ ok: false, error: "Error al iniciar sesión" });
@@ -58,9 +68,15 @@ router.get("/me", async (req, res) => {
     if (!req.session?.userId) {
       return res.status(401).json({ ok: false });
     }
-    const user = await Usuario.findById(req.session.userId).select("email numericId");
+    const user = await Usuario.findById(req.session.userId).select("email numericId role");
     if (!user) return res.status(401).json({ ok: false });
-    return res.json({ ok: true, id: user._id, email: user.email, numericId: user.numericId });
+    return res.json({
+      ok: true,
+      id: user._id,
+      email: user.email,
+      numericId: user.numericId,
+      role: user.role || "encuestador",
+    });
   } catch {
     return res.status(500).json({ ok: false, error: "Error" });
   }
