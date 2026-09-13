@@ -1,0 +1,889 @@
+[
+  {
+    "name": 1,
+    "codigo": "PR01",
+    "title": "¿Dónde inicia normalmente este viaje?",
+    "isRequired": true,
+    "type": "autocomplete",
+    "placeholder": "Escriba para buscar el lugar de origen...",
+    "choices": [
+      "El Tigre",
+      "Barranquillita",
+      "Impancay",
+      "Casa Verde / acceso aeropuerto / Zungo Embarcadero",
+      "El Reposo",
+      "Panamericana",
+      "Zungo Carretera",
+      "Río Grande",
+      "Currulao",
+      "El Tres",
+      "Mutatá – cabecera",
+      "Chigorodó – cabecera",
+      "Carepa – cabecera",
+      "Apartadó – cabecera",
+      "Turbo – cabecera",
+      "Necoclí – cabecera",
+      "San Pedro – cabecera",
+      "San Juan – cabecera",
+      "Arboletes – cabecera"
+    ],
+    "output": "origen_id",
+    "orden": [
+      {
+        "tipo": "Viaje",
+        "orden": 2
+      }
+    ],
+    "description": "Vamos a trabajar con un solo viaje de referencia durante toda la encuesta."
+  },
+  {
+    "name": 2,
+    "codigo": "PR02",
+    "title": "¿Dónde termina normalmente este viaje?",
+    "isRequired": true,
+    "type": "autocomplete",
+    "placeholder": "Escriba para buscar el lugar de destino...",
+    "choices": [
+      "El Tigre",
+      "Barranquillita",
+      "Impancay",
+      "Casa Verde / acceso aeropuerto / Zungo Embarcadero",
+      "El Reposo",
+      "Panamericana",
+      "Zungo Carretera",
+      "Río Grande",
+      "Currulao",
+      "El Tres",
+      "Mutatá – cabecera",
+      "Chigorodó – cabecera",
+      "Carepa – cabecera",
+      "Apartadó – cabecera",
+      "Turbo – cabecera",
+      "Necoclí – cabecera",
+      "San Pedro – cabecera",
+      "San Juan – cabecera",
+      "Arboletes – cabecera"
+    ],
+    "output": "destino_id",
+    "orden": [
+      {
+        "tipo": "Viaje",
+        "orden": 3
+      }
+    ],
+    "description": "Seleccione el lugar donde termina ese mismo viaje de referencia."
+  },
+  {
+    "name": 3,
+    "codigo": "PR03",
+    "title": "¿Cuál es el principal motivo por el que realiza este viaje?",
+    "isRequired": true,
+    "type": "radiogroup",
+    "choices": [
+      "Trabajo",
+      "Estudio",
+      "Salud",
+      "Compras",
+      "Trámites o servicios",
+      "Visitar familiares/amigos",
+      "Recreación/turismo",
+      "Otro"
+    ],
+    "output": "motivo",
+    "orden": [
+      {
+        "tipo": "Viaje",
+        "orden": 4
+      }
+    ]
+  },
+  {
+    "name": 4,
+    "codigo": "PR04",
+    "title": "Pensando específicamente en este viaje entre [ORIGEN] y [DESTINO], ¿con qué frecuencia realiza normalmente este recorrido? (viajes)",
+    "isRequired": true,
+    "type": "radiogroup",
+    "choices": [
+      "10+ /sem",
+      "5-9 /sem",
+      "3-4 /sem",
+      "1-2 /sem",
+      "2-3 /mes",
+      "~1 /mes",
+      "<1 /mes"
+    ],
+    "description": "Cada recorrido en un solo sentido cuenta como un viaje. Ir y regresar cuentan como dos viajes.",
+    "output": "frecuencia_od",
+    "orden": [
+      {
+        "tipo": "Viaje",
+        "orden": 5
+      }
+    ]
+  },
+  {
+    "name": 5,
+    "codigo": "PR05",
+    "title": "¿Cuál es el principal modo de transporte que utiliza normalmente para realizar este viaje?",
+    "isRequired": true,
+    "type": "radiogroup",
+    "choices": [
+      "AUTO",
+      "MOTO",
+      "BUS",
+      "TAXI"
+    ],
+    "output": "modo_actual",
+    "rule": "TAXI=>SIN_PD_MODAL_CONTINUAR_POST_PD",
+    "orden": [
+      {
+        "tipo": "Modo",
+        "orden": 6
+      }
+    ],
+    "description": "Si utiliza varios modos durante el recorrido, seleccione el modo principal del viaje."
+  },
+  {
+    "name": 6,
+    "codigo": "PR06",
+    "title": "Cuando realiza normalmente este viaje, usted viaja como:",
+    "isRequired": true,
+    "type": "radiogroup",
+    "choices": [
+      "CONDUCTOR",
+      "ACOMPAÑANTE"
+    ],
+    "visibleIf": "{modo_actual} anyof ['AUTO', 'MOTO']",
+    "output": "rol",
+    "orden": [
+      {
+        "tipo": "Modo",
+        "orden": 7
+      }
+    ]
+  },
+  {
+    "name": 7,
+    "codigo": "PR06M",
+    "title": "¿Qué tipo de motocicleta utiliza normalmente para este viaje? (cc)",
+    "isRequired": true,
+    "type": "radiogroup",
+    "choices": [
+      "<=125cc",
+      "126-200cc",
+      ">200cc",
+      "Eléctrica",
+      "No sabe"
+    ],
+    "visibleIf": "{modo_actual} = 'MOTO' and {rol} = 'CONDUCTOR'",
+    "output": "categoria_moto",
+    "orden": [
+      {
+        "tipo": "Modo",
+        "orden": 7.1
+      }
+    ]
+  },
+  {
+    "name": 8,
+    "codigo": "PR06A",
+    "title": "¿Qué tipo de vehículo utiliza normalmente para este viaje?",
+    "isRequired": true,
+    "type": "radiogroup",
+    "choices": [
+      "Automóvil",
+      "Camioneta/SUV",
+      "Pick-up",
+      "Otro",
+      "No sabe"
+    ],
+    "visibleIf": "{modo_actual} = 'AUTO' and {rol} = 'CONDUCTOR'",
+    "output": "tipo_auto",
+    "orden": [
+      {
+        "tipo": "Modo",
+        "orden": 7.2
+      }
+    ]
+  },
+  {
+    "name": 9,
+    "codigo": "PR06AF",
+    "title": "¿Qué tipo de energía o combustible utiliza principalmente este vehículo?",
+    "isRequired": true,
+    "type": "radiogroup",
+    "choices": [
+      "Gasolina",
+      "Diésel",
+      "Eléctrico",
+      "Otro",
+      "No sabe"
+    ],
+    "visibleIf": "{modo_actual} = 'AUTO' and {rol} = 'CONDUCTOR'",
+    "description": "Híbrido se agrupa con gasolina para el piloto.",
+    "output": "energia_auto",
+    "orden": [
+      {
+        "tipo": "Modo",
+        "orden": 7.3
+      }
+    ]
+  },
+  {
+    "name": 10,
+    "codigo": "PR07",
+    "title": "Normalmente, ¿cuánto tiempo tarda en realizar este viaje completo entre [ORIGEN] y [DESTINO]? (minutos)",
+    "isRequired": true,
+    "type": "text",
+    "inputType": "number",
+    "unit": "minutos",
+    "rango": {
+      "min": 0,
+      "max": 600,
+      "unidad": "minutos"
+    },
+    "output": "tiempo_declarado_min",
+    "orden": [
+      {
+        "tipo": "Estado inicial",
+        "orden": 8
+      }
+    ],
+    "description": "Considere el tiempo total desde que inicia el viaje hasta que llega al destino."
+  },
+  {
+    "name": 11,
+    "codigo": "PR08",
+    "title": "Para completar este viaje, ¿cuántas veces necesita cambiar de vehículo o servicio de transporte? (veces)",
+    "isRequired": true,
+    "type": "radiogroup",
+    "choices": [
+      "0",
+      "1",
+      "2",
+      "3+"
+    ],
+    "output": "cambios_actuales",
+    "orden": [
+      {
+        "tipo": "Estado inicial",
+        "orden": 9
+      }
+    ],
+    "description": "Cuente un cambio cuando debe bajarse de un vehículo o servicio y continuar en otro."
+  },
+  {
+    "name": 12,
+    "codigo": "PR09",
+    "title": "Pensando solamente en este trayecto, aproximadamente ¿cuánto le cuesta realizarlo? (COP)",
+    "isRequired": true,
+    "type": "text",
+    "inputType": "number",
+    "unit": "COP",
+    "rango": {
+      "min": 0,
+      "max": 500000,
+      "unidad": "COP"
+    },
+    "description": "Piense en un solo trayecto y en el dinero que usted normalmente paga o aporta para realizarlo. Para acompañante en vehículo privado, $0 es válido.",
+    "output": "costo_declarado",
+    "orden": [
+      {
+        "tipo": "Estado inicial",
+        "orden": 10
+      }
+    ]
+  },
+  {
+    "name": 13,
+    "codigo": "SE01",
+    "title": "¿En qué municipio vive habitualmente?",
+    "isRequired": true,
+    "type": "radiogroup",
+    "choices": [
+      "Chigorodó",
+      "Carepa",
+      "Apartadó",
+      "Turbo",
+      "Mutatá",
+      "Necoclí",
+      "San Pedro de Urabá",
+      "San Juan de Urabá",
+      "Arboletes"
+    ],
+    "output": "municipio_residencia",
+    "orden": [
+      {
+        "tipo": "Socioeconómico",
+        "orden": 11
+      }
+    ]
+  },
+  {
+    "name": 14,
+    "codigo": "SE02",
+    "title": "¿Cuántos años tiene? (años)",
+    "isRequired": true,
+    "type": "text",
+    "inputType": "number",
+    "unit": "años",
+    "rango": {
+      "min": 10,
+      "max": 99,
+      "unidad": "años"
+    },
+    "description": "Pueden participar menores que realizan autónomamente el viaje; prevalece protocolo ético.",
+    "output": "edad",
+    "orden": [
+      {
+        "tipo": "Socioeconómico",
+        "orden": 12
+      }
+    ]
+  },
+  {
+    "name": 15,
+    "codigo": "SE03",
+    "title": "¿Con cuál de las siguientes opciones se identifica?",
+    "isRequired": true,
+    "type": "radiogroup",
+    "choices": [
+      "Mujer",
+      "Hombre",
+      "Persona no binaria",
+      "Otra identidad",
+      "Prefiero no responder"
+    ],
+    "output": "genero",
+    "orden": [
+      {
+        "tipo": "Socioeconómico",
+        "orden": 13
+      }
+    ]
+  },
+  {
+    "name": 16,
+    "codigo": "SE04",
+    "title": "¿Cuál es el nivel educativo más alto que ha aprobado?",
+    "isRequired": true,
+    "type": "radiogroup",
+    "choices": [
+      "Ninguno",
+      "Primaria",
+      "Secundaria",
+      "Media/bachillerato",
+      "Técnico",
+      "Tecnológico",
+      "Universitario",
+      "Posgrado",
+      "Prefiero no responder"
+    ],
+    "output": "educacion",
+    "orden": [
+      {
+        "tipo": "Socioeconómico",
+        "orden": 14
+      }
+    ]
+  },
+  {
+    "name": 17,
+    "codigo": "SE05",
+    "title": "Actualmente, ¿cuál es su actividad principal?",
+    "isRequired": true,
+    "type": "radiogroup",
+    "choices": [
+      "Empleado(a)",
+      "Independiente",
+      "Estudia",
+      "Trabajo doméstico/cuidado no remunerado",
+      "Busca trabajo",
+      "Pensionado(a)",
+      "No trabaja ni estudia",
+      "Otra"
+    ],
+    "output": "actividad",
+    "orden": [
+      {
+        "tipo": "Socioeconómico",
+        "orden": 15
+      }
+    ]
+  },
+  {
+    "name": 18,
+    "codigo": "SE05B",
+    "title": "¿En qué sector desarrolla principalmente su actividad?",
+    "isRequired": true,
+    "type": "radiogroup",
+    "choices": [
+      "Agropecuario/finca",
+      "Agroindustrial/bananero",
+      "Comercio",
+      "Transporte",
+      "Servicios",
+      "Construcción/industria",
+      "Sector público",
+      "Otro"
+    ],
+    "visibleIf": "{actividad} anyof ['Empleado(a)', 'Independiente']",
+    "output": "sector_actividad",
+    "orden": [
+      {
+        "tipo": "Socioeconómico",
+        "orden": 16
+      }
+    ]
+  },
+  {
+    "name": 19,
+    "codigo": "SE06",
+    "title": "¿Cuál es el estrato de la vivienda donde vive habitualmente?",
+    "isRequired": true,
+    "type": "radiogroup",
+    "choices": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "No aplica",
+      "No sabe",
+      "Prefiero no responder"
+    ],
+    "output": "estrato",
+    "orden": [
+      {
+        "tipo": "Socioeconómico",
+        "orden": 17
+      }
+    ]
+  },
+  {
+    "name": 20,
+    "codigo": "SE07",
+    "title": "Pensando en un mes normal y sumando los ingresos de todas las personas de su hogar, ¿en qué rango se encuentra aproximadamente el ingreso mensual total del hogar? (SMLMV)",
+    "isRequired": true,
+    "type": "radiogroup",
+    "choices": [
+      "Sin ingresos",
+      "<=1 SMLMV",
+      ">1-2 SMLMV",
+      ">2-3 SMLMV",
+      ">3-4 SMLMV",
+      ">4-6 SMLMV",
+      ">6 SMLMV",
+      "No sabe",
+      "Prefiero no responder"
+    ],
+    "output": "ingreso_hogar_rango",
+    "orden": [
+      {
+        "tipo": "Socioeconómico",
+        "orden": 18
+      }
+    ],
+    "description": "Considere los ingresos mensuales de todas las personas del hogar, no solamente los suyos."
+  },
+  {
+    "name": 21,
+    "codigo": "SE08",
+    "title": "Incluyéndose usted, ¿cuántas personas viven habitualmente en su hogar? (personas)",
+    "isRequired": true,
+    "type": "text",
+    "inputType": "number",
+    "unit": "personas",
+    "rango": {
+      "min": 1,
+      "max": 20,
+      "unidad": "personas"
+    },
+    "output": "tam_hogar",
+    "orden": [
+      {
+        "tipo": "Socioeconómico",
+        "orden": 19
+      }
+    ]
+  },
+  {
+    "name": 22,
+    "codigo": "SE09",
+    "title": "¿Cuántos automóviles y motocicletas están disponibles habitualmente para las personas de su hogar?",
+    "isRequired": true,
+    "type": "multipletext",
+    "defaultValue": {
+      "autos": "",
+      "motos": ""
+    },
+    "items": [
+      {
+        "name": "autos",
+        "title": "Automóviles (cantidad)",
+        "inputType": "number",
+        "unit": "cantidad",
+        "rango": {
+          "min": 0,
+          "max": 15,
+          "unidad": "autos"
+        }
+      },
+      {
+        "name": "motos",
+        "title": "Motocicletas (cantidad)",
+        "inputType": "number",
+        "unit": "cantidad",
+        "rango": {
+          "min": 0,
+          "max": 15,
+          "unidad": "motos"
+        }
+      }
+    ],
+    "output": [
+      "autos_hogar",
+      "motos_hogar"
+    ],
+    "orden": [
+      {
+        "tipo": "Socioeconómico",
+        "orden": 20
+      }
+    ]
+  },
+  {
+    "name": 23,
+    "codigo": "CARE01",
+    "title": "Cuando realiza normalmente este viaje, ¿viaja con alguna persona que necesite de su acompañamiento o cuidado?",
+    "isRequired": true,
+    "type": "checkbox",
+    "choices": [
+      "No",
+      "Niño/a o adolescente",
+      "Persona mayor que requiere acompañamiento",
+      "Persona que requiere asistencia",
+      "Otra situación de cuidado"
+    ],
+    "description": "“No” es exclusiva; las demás pueden ser múltiples.",
+    "output": "acompanamiento_cuidado",
+    "orden": [
+      {
+        "tipo": "Viaje",
+        "orden": 21
+      }
+    ]
+  },
+  {
+    "name": "COM01",
+    "codigo": "COM01",
+    "title": "Para mí es importante contar con suficiente espacio durante el viaje.",
+    "description": "Ahora piense en lo que usted valora normalmente cuando viaja. No piense específicamente en el sistema que acaba de ver; responda según sus preferencias habituales. Use la escala de 1 (Totalmente en desacuerdo) a 7 (Totalmente de acuerdo).",
+    "isRequired": true,
+    "type": "likert",
+    "layout": "vertical",
+    "minRate": 1,
+    "maxRate": 7,
+    "invertido": false,
+    "choices": [
+      {
+        "value": 1,
+        "text": "1. Totalmente en desacuerdo"
+      },
+      {
+        "value": 2,
+        "text": "2. En desacuerdo"
+      },
+      {
+        "value": 3,
+        "text": "3. Algo en desacuerdo"
+      },
+      {
+        "value": 4,
+        "text": "4. Ni de acuerdo ni en desacuerdo"
+      },
+      {
+        "value": 5,
+        "text": "5. Algo de acuerdo"
+      },
+      {
+        "value": 6,
+        "text": "6. De acuerdo"
+      },
+      {
+        "value": 7,
+        "text": "7. Totalmente de acuerdo"
+      }
+    ],
+    "output": "COM01",
+    "orden": [
+      {
+        "tipo": "Comodidad",
+        "orden": 22
+      }
+    ],
+    "renderAfterScenarios": true
+  },
+  {
+    "name": "COM02",
+    "codigo": "COM02",
+    "title": "Para mí es importante poder viajar sentado durante la mayor parte del recorrido.",
+    "isRequired": true,
+    "type": "likert",
+    "layout": "vertical",
+    "minRate": 1,
+    "maxRate": 7,
+    "invertido": false,
+    "choices": [
+      {
+        "value": 1,
+        "text": "1. Totalmente en desacuerdo"
+      },
+      {
+        "value": 2,
+        "text": "2. En desacuerdo"
+      },
+      {
+        "value": 3,
+        "text": "3. Algo en desacuerdo"
+      },
+      {
+        "value": 4,
+        "text": "4. Ni de acuerdo ni en desacuerdo"
+      },
+      {
+        "value": 5,
+        "text": "5. Algo de acuerdo"
+      },
+      {
+        "value": 6,
+        "text": "6. De acuerdo"
+      },
+      {
+        "value": 7,
+        "text": "7. Totalmente de acuerdo"
+      }
+    ],
+    "output": "COM02",
+    "orden": [
+      {
+        "tipo": "Comodidad",
+        "orden": 23
+      }
+    ],
+    "renderAfterScenarios": true
+  },
+  {
+    "name": "COM03",
+    "codigo": "COM03",
+    "title": "La temperatura dentro del vehículo influye en qué tan cómodo considero un viaje.",
+    "isRequired": true,
+    "type": "likert",
+    "layout": "vertical",
+    "minRate": 1,
+    "maxRate": 7,
+    "invertido": false,
+    "choices": [
+      {
+        "value": 1,
+        "text": "1. Totalmente en desacuerdo"
+      },
+      {
+        "value": 2,
+        "text": "2. En desacuerdo"
+      },
+      {
+        "value": 3,
+        "text": "3. Algo en desacuerdo"
+      },
+      {
+        "value": 4,
+        "text": "4. Ni de acuerdo ni en desacuerdo"
+      },
+      {
+        "value": 5,
+        "text": "5. Algo de acuerdo"
+      },
+      {
+        "value": 6,
+        "text": "6. De acuerdo"
+      },
+      {
+        "value": 7,
+        "text": "7. Totalmente de acuerdo"
+      }
+    ],
+    "output": "COM03",
+    "orden": [
+      {
+        "tipo": "Comodidad",
+        "orden": 24
+      }
+    ],
+    "renderAfterScenarios": true
+  },
+  {
+    "name": "COM04",
+    "codigo": "COM04",
+    "title": "La limpieza y el buen estado del vehículo son importantes cuando elijo cómo viajar.",
+    "isRequired": true,
+    "type": "likert",
+    "layout": "vertical",
+    "minRate": 1,
+    "maxRate": 7,
+    "invertido": false,
+    "choices": [
+      {
+        "value": 1,
+        "text": "1. Totalmente en desacuerdo"
+      },
+      {
+        "value": 2,
+        "text": "2. En desacuerdo"
+      },
+      {
+        "value": 3,
+        "text": "3. Algo en desacuerdo"
+      },
+      {
+        "value": 4,
+        "text": "4. Ni de acuerdo ni en desacuerdo"
+      },
+      {
+        "value": 5,
+        "text": "5. Algo de acuerdo"
+      },
+      {
+        "value": 6,
+        "text": "6. De acuerdo"
+      },
+      {
+        "value": 7,
+        "text": "7. Totalmente de acuerdo"
+      }
+    ],
+    "output": "COM04",
+    "orden": [
+      {
+        "tipo": "Comodidad",
+        "orden": 25
+      }
+    ],
+    "renderAfterScenarios": true
+  },
+  {
+    "name": "COM05",
+    "codigo": "COM05",
+    "title": "Evito, cuando puedo, servicios en los que normalmente se viaja con demasiadas personas dentro del vehículo.",
+    "isRequired": true,
+    "type": "likert",
+    "layout": "vertical",
+    "minRate": 1,
+    "maxRate": 7,
+    "invertido": false,
+    "choices": [
+      {
+        "value": 1,
+        "text": "1. Totalmente en desacuerdo"
+      },
+      {
+        "value": 2,
+        "text": "2. En desacuerdo"
+      },
+      {
+        "value": 3,
+        "text": "3. Algo en desacuerdo"
+      },
+      {
+        "value": 4,
+        "text": "4. Ni de acuerdo ni en desacuerdo"
+      },
+      {
+        "value": 5,
+        "text": "5. Algo de acuerdo"
+      },
+      {
+        "value": 6,
+        "text": "6. De acuerdo"
+      },
+      {
+        "value": 7,
+        "text": "7. Totalmente de acuerdo"
+      }
+    ],
+    "output": "COM05",
+    "orden": [
+      {
+        "tipo": "Comodidad",
+        "orden": 26
+      }
+    ],
+    "renderAfterScenarios": true
+  },
+  {
+    "name": "COM06",
+    "codigo": "COM06",
+    "title": "Para viajes como este, las condiciones dentro del vehículo me importan poco si puedo llegar al destino.",
+    "isRequired": true,
+    "type": "likert",
+    "layout": "vertical",
+    "minRate": 1,
+    "maxRate": 7,
+    "invertido": true,
+    "choices": [
+      {
+        "value": 1,
+        "text": "1. Totalmente en desacuerdo"
+      },
+      {
+        "value": 2,
+        "text": "2. En desacuerdo"
+      },
+      {
+        "value": 3,
+        "text": "3. Algo en desacuerdo"
+      },
+      {
+        "value": 4,
+        "text": "4. Ni de acuerdo ni en desacuerdo"
+      },
+      {
+        "value": 5,
+        "text": "5. Algo de acuerdo"
+      },
+      {
+        "value": 6,
+        "text": "6. De acuerdo"
+      },
+      {
+        "value": 7,
+        "text": "7. Totalmente de acuerdo"
+      }
+    ],
+    "output": "COM06",
+    "orden": [
+      {
+        "tipo": "Comodidad",
+        "orden": 27
+      }
+    ],
+    "renderAfterScenarios": true
+  },
+  {
+    "name": "OBS01",
+    "codigo": "OBS01",
+    "title": "Observaciones del encuestador",
+    "description": "Uso del encuestador. Registre únicamente información que ayude a interpretar la encuesta: otro origen-destino relevante mencionado por la persona, particularidades del viaje, dificultades de comprensión, alternativas no contempladas u otra situación relevante.",
+    "isRequired": false,
+    "type": "text",
+    "output": "observaciones_encuestador",
+    "renderAfterScenarios": true,
+    "orden": [
+      {
+        "tipo": "Control de campo",
+        "orden": 28
+      }
+    ]
+  }
+]

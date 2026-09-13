@@ -2,6 +2,7 @@
 import { Router } from "express";
 import Encuesta from "../models/Encuesta.js";
 import Usuario from "../models/Usuario.js";
+import { buildRespuestasCsv, buildRespuestasXlsx } from "../utils/exportRespuestas.js";
 
 const router = Router();
 
@@ -84,6 +85,9 @@ router.get("/export", async (req, res) => {
   }
 });
 
+const TIPO_PRPD = "PRPD_uraba";
+const PRPD_DESDE = "2026-09-01";
+
 function rangoDiaBogota(fecha) {
   const day =
     fecha && /^\d{4}-\d{2}-\d{2}$/.test(String(fecha))
@@ -92,6 +96,10 @@ function rangoDiaBogota(fecha) {
   const start = new Date(`${day}T00:00:00-05:00`);
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
   return { day, start, end };
+}
+
+function enUrabaAntioquia(lat, lng) {
+  return lat >= 7.15 && lat <= 8.95 && lng >= -77.05 && lng <= -76.15;
 }
 
 function pairFromGeo(geo) {
@@ -103,11 +111,99 @@ function pairFromGeo(geo) {
   return { lat, lng };
 }
 
+function normalizeCedula(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function cedulaValida(value) {
+  const digits = normalizeCedula(value);
+  return digits.length >= 6 && digits.length <= 12 ? digits : null;
+}
+
+function cedulaDesdeBody(body, respuestas) {
+  const hit = (respuestas || []).find((r) => r?.name === "cc_encuestador");
+  return cedulaValida(body?.cc_encuestador ?? hit?.value);
+}
+
 function cedulaFrom(doc) {
   const hit = (doc.respuestas || []).find((r) => r?.name === "cc_encuestador");
-  return hit?.value != null && String(hit.value).trim()
+  const raw = hit?.value != null && String(hit.value).trim()
     ? String(hit.value).trim()
     : null;
+  return normalizeCedula(raw) || raw;
+}
+
+async function requireSeguimiento(req, res) {
+  if (!req.session?.userId) {
+    res.status(401).json({ error: "No autenticado" });
+    return null;
+  }
+  const user = await Usuario.findById(req.session.userId).select("email role");
+  if (!user) {
+    res.status(401).json({ error: "No autenticado" });
+    return null;
+  }
+  if ((user.role || "encuestador") !== "seguimiento") {
+    res.status(403).json({ error: "Sin permiso de seguimiento" });
+    return null;
+  }
+  return user;
+}
+
+function rangoFechasBogota(desde, hasta) {
+  const min = rangoDiaBogota(PRPD_DESDE);
+  const a = rangoDiaBogota(desde);
+  const b = rangoDiaBogota(hasta || desde);
+  let start = a.start <= b.start ? a.start : b.start;
+  const end = a.end >= b.end ? a.end : b.end;
+  if (start < min.start) start = min.start;
+  const maxMs = 400 * 24 * 60 * 60 * 1000;
+  if (end - start > maxMs) {
+    const err = new Error("El rango no puede superar 400 días");
+    err.status = 400;
+    throw err;
+  }
+  return {
+    desde: start.toLocaleDateString("en-CA", { timeZone: "America/Bogota" }),
+    hasta: new Date(end.getTime() - 1).toLocaleDateString("en-CA", {
+      timeZone: "America/Bogota",
+    }),
+    start,
+    end,
+  };
+}
+
+function filtroRango(start, end) {
+  return {
+    $or: [
+      { createdAt: { $gte: start, $lt: end } },
+      { finishedAt: { $gte: start, $lt: end } },
+      { startedAt: { $gte: start, $lt: end } },
+    ],
+  };
+}
+
+function filtroPrpdRango(start, end) {
+  return { tipo: TIPO_PRPD, ...filtroRango(start, end) };
+}
+
+function preguntasCount(doc) {
+  if (typeof doc.answeredCount === "number" && doc.answeredCount > 0) {
+    return doc.answeredCount;
+  }
+  const resps = (doc.respuestas || []).filter(
+    (r) => r?.name && r.name !== "cc_encuestador"
+  );
+  return uniqueAnsweredCount(resps);
+}
+
+function duracionSegundos(doc) {
+  const ini = doc.startedAt || doc.createdAt;
+  const fin = doc.finishedAt;
+  if (!ini || !fin) return null;
+  const ms = new Date(fin) - new Date(ini);
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  return Math.round(ms / 1000);
 }
 
 function horaBogota(value) {
@@ -129,26 +225,24 @@ function momentoEnvio(doc) {
   return doc.finishedAt || doc.startedAt || doc.createdAt || null;
 }
 
+
 // GET /api/encuestas/seguimiento — totales + puntos GPS del día (rol seguimiento)
 router.get("/seguimiento", async (req, res) => {
   try {
-    if (!req.session?.userId) {
-      return res.status(401).json({ error: "No autenticado" });
-    }
-    const user = await Usuario.findById(req.session.userId).select("email role");
-    if (!user) return res.status(401).json({ error: "No autenticado" });
-    if ((user.role || "encuestador") !== "seguimiento") {
-      return res.status(403).json({ error: "Sin permiso de seguimiento" });
-    }
+    if (!(await requireSeguimiento(req, res))) return;
 
-    const { day, start, end } = rangoDiaBogota(req.query.fecha);
-    const filtro = {
-      $or: [
-        { createdAt: { $gte: start, $lt: end } },
-        { finishedAt: { $gte: start, $lt: end } },
-        { startedAt: { $gte: start, $lt: end } },
-      ],
-    };
+    let rango;
+    try {
+      if (req.query.desde || req.query.hasta) {
+        rango = rangoFechasBogota(req.query.desde, req.query.hasta);
+      } else {
+        const one = rangoDiaBogota(req.query.fecha);
+        rango = { desde: one.day, hasta: one.day, start: one.start, end: one.end };
+      }
+    } catch (e) {
+      return res.status(e.status || 400).json({ error: e.message });
+    }
+    const filtro = filtroPrpdRango(rango.start, rango.end);
     const docs = await Encuesta.find(filtro).lean();
 
     const puntos = [];
@@ -182,7 +276,7 @@ router.get("/seguimiento", async (req, res) => {
       if (prueba) porCedula[cedula].prueba += 1;
 
       const geo = pairFromGeo(doc.coordsEnd) || pairFromGeo(doc.coordsStart);
-      if (!geo) continue;
+      if (!geo || !enUrabaAntioquia(geo.lat, geo.lng)) continue;
       conGps += 1;
       const enviada = momentoEnvio(doc);
       puntos.push({
@@ -203,7 +297,9 @@ router.get("/seguimiento", async (req, res) => {
 
     return res.json({
       ok: true,
-      fecha: day,
+      fecha: rango.hasta,
+      desde: rango.desde,
+      hasta: rango.hasta,
       total: docs.length,
       finalizadas,
       abiertas: docs.length - finalizadas,
@@ -219,6 +315,161 @@ router.get("/seguimiento", async (req, res) => {
   }
 });
 
+// GET /api/encuestas/seguimiento/cedulas
+router.get("/seguimiento/cedulas", async (req, res) => {
+  try {
+    if (!(await requireSeguimiento(req, res))) return;
+    const { start } = rangoDiaBogota(PRPD_DESDE);
+    const rows = await Encuesta.aggregate([
+      {
+        $match: {
+          tipo: TIPO_PRPD,
+          finishedAt: { $gte: start },
+        },
+      },
+      { $unwind: "$respuestas" },
+      { $match: { "respuestas.name": "cc_encuestador" } },
+      {
+        $project: {
+          cedula: {
+            $trim: { input: { $toString: { $ifNull: ["$respuestas.value", ""] } } },
+          },
+        },
+      },
+      { $match: { cedula: { $ne: "" } } },
+      { $group: { _id: "$cedula", total: { $sum: 1 } } },
+      { $sort: { total: -1, _id: 1 } },
+    ]);
+    const byCedula = new Map();
+    for (const r of rows) {
+      const cedula = normalizeCedula(r._id) || String(r._id);
+      byCedula.set(cedula, (byCedula.get(cedula) || 0) + r.total);
+    }
+    const cedulas = [...byCedula.entries()]
+      .map(([cedula, total]) => ({ cedula, total }))
+      .sort((a, b) => b.total - a.total || a.cedula.localeCompare(b.cedula));
+    return res.json({ ok: true, cedulas });
+  } catch (e) {
+    console.error("Error cedulas seguimiento:", e);
+    return res.status(500).json({ error: "No se pudieron listar las cédulas" });
+  }
+});
+
+// GET /api/encuestas/seguimiento/detalle?cedula=&desde=&hasta=
+router.get("/seguimiento/detalle", async (req, res) => {
+  try {
+    if (!(await requireSeguimiento(req, res))) return;
+    const rawCedula = String(req.query.cedula || "").trim();
+    const cedula = normalizeCedula(rawCedula);
+    const sinCedula =
+      !cedula &&
+      (rawCedula === "(sin cédula)" || rawCedula.toLowerCase() === "sin cedula");
+    if (!cedula && !sinCedula) {
+      return res.status(400).json({ error: "Indica una cédula" });
+    }
+
+    let rango;
+    try {
+      rango = rangoFechasBogota(req.query.desde, req.query.hasta);
+    } catch (e) {
+      return res.status(e.status || 400).json({ error: e.message });
+    }
+
+    const docs = await Encuesta.find(filtroPrpdRango(rango.start, rango.end))
+      .select("code tipo isTest startedAt finishedAt createdAt answeredCount respuestas")
+      .sort({ startedAt: 1, createdAt: 1 })
+      .lean();
+
+    const encuestas = docs
+      .filter((doc) => {
+        const value = normalizeCedula(cedulaFrom(doc));
+        return sinCedula ? !value : value === cedula;
+      })
+      .map((doc) => {
+        const inicio = doc.startedAt || doc.createdAt || null;
+        const fin = doc.finishedAt || null;
+        return {
+          id: String(doc._id),
+          code: doc.code || null,
+          tipo: doc.tipo || null,
+          isTest: doc.isTest === true,
+          finalizada: !!fin,
+          inicio: inicio ? new Date(inicio).toISOString() : null,
+          fin: fin ? new Date(fin).toISOString() : null,
+          duracion_s: duracionSegundos(doc),
+          preguntas: preguntasCount(doc),
+        };
+      });
+
+    return res.json({
+      ok: true,
+      cedula: sinCedula ? "(sin cédula)" : cedula,
+      desde: rango.desde,
+      hasta: rango.hasta,
+      total: encuestas.length,
+      encuestas,
+    });
+  } catch (e) {
+    console.error("Error detalle seguimiento:", e);
+    return res.status(500).json({ error: "No se pudo leer el detalle" });
+  }
+});
+
+// GET /api/encuestas/seguimiento/csv — respuestas desde septiembre 2026
+router.get("/seguimiento/csv", async (req, res) => {
+  try {
+    if (!(await requireSeguimiento(req, res))) return;
+    const { start } = rangoDiaBogota(PRPD_DESDE);
+    const end = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const docs = await Encuesta.find(filtroRango(start, end))
+      .select("code tipo isTest startedAt finishedAt answeredCount respuestas")
+      .sort({ startedAt: 1, createdAt: 1 })
+      .lean();
+    const csv = buildRespuestasCsv(docs);
+    const day = new Date().toLocaleDateString("en-CA", {
+      timeZone: "America/Bogota",
+    });
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="encuestas-respuestas-${day}.csv"`
+    );
+    return res.send(csv);
+  } catch (e) {
+    console.error("Error csv seguimiento:", e);
+    return res.status(500).json({ error: "No se pudo generar el CSV" });
+  }
+});
+
+// GET /api/encuestas/seguimiento/xlsx — respuestas + diccionario de preguntas
+router.get("/seguimiento/xlsx", async (req, res) => {
+  try {
+    if (!(await requireSeguimiento(req, res))) return;
+    const { start } = rangoDiaBogota(PRPD_DESDE);
+    const end = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const docs = await Encuesta.find(filtroRango(start, end))
+      .select("code tipo isTest startedAt finishedAt createdAt answeredCount respuestas")
+      .sort({ startedAt: 1, createdAt: 1 })
+      .lean();
+    const xlsx = buildRespuestasXlsx(docs);
+    const day = new Date().toLocaleDateString("en-CA", {
+      timeZone: "America/Bogota",
+    });
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="encuestas-respuestas-${day}.xlsx"`
+    );
+    return res.send(xlsx);
+  } catch (e) {
+    console.error("Error xlsx seguimiento:", e);
+    return res.status(500).json({ error: "No se pudo generar el Excel" });
+  }
+});
+
 // POST /api/encuestas/start
 router.post("/start", async (req, res) => {
   try {
@@ -231,17 +482,16 @@ router.post("/start", async (req, res) => {
     }
 
     // leer y normalizar flags/metas
-    const empresaRaw =
-      req.body.empresaEncuestadora ??
-      req.body.empresa ??
-      req.body.encuestadora;
-
-    const empresa = normalizeEmpresa(empresaRaw);
-    if (!empresa) {
-      return res
-        .status(400)
-        .json({ error: "empresaEncuestadora inválida o faltante (MJ | C&A | Global)" });
+    const cedula = cedulaDesdeBody(req.body, req.body.respuestas);
+    if (!cedula) {
+      return res.status(400).json({
+        error: "La cédula del encuestador es obligatoria (6 a 12 dígitos).",
+      });
     }
+
+    const empresa = normalizeEmpresa(
+      req.body.empresaEncuestadora ?? req.body.empresa ?? req.body.encuestadora
+    );
 
     const isTest =
       req.body.isTest === true
@@ -261,13 +511,21 @@ router.post("/start", async (req, res) => {
       : null;
 
     const encuesta = new Encuesta({
-      tipo,                // "usuarios" | "locales"
-      subtipo,             // "Residencial", "Comercio/Establecimiento", etc.
+      tipo,
+      subtipo,
       createdBy,
-      empresaEncuestadora: empresa,   // <-- guardamos empresa
-      isTest,                         // <-- boolean garantizado
+      empresaEncuestadora: empresa || undefined,
+      isTest,
       startedAt: new Date(),
       coordsStart: toGeo(req.body, "start."),
+      respuestas: [
+        {
+          name: "cc_encuestador",
+          title: "Cédula del encuestador",
+          type: "cc_encuestador",
+          value: cedula,
+        },
+      ],
     });
 
     await encuesta.save();
@@ -300,6 +558,26 @@ router.put("/:id/finalizar", async (req, res) => {
 
     if (Array.isArray(respuestas) && respuestas.length) {
       doc.respuestas = respuestas.map((r) => ({ ...r, encuestaId: doc._id }));
+    }
+    const cedula = cedulaDesdeBody(req.body, doc.respuestas);
+    if (!cedula) {
+      return res.status(400).json({
+        ok: false,
+        error: "La cédula del encuestador es obligatoria (6 a 12 dígitos).",
+      });
+    }
+    const hasCc = (doc.respuestas || []).some((r) => r?.name === "cc_encuestador");
+    if (!hasCc) {
+      doc.respuestas = [
+        ...(doc.respuestas || []),
+        {
+          encuestaId: doc._id,
+          name: "cc_encuestador",
+          title: "Cédula del encuestador",
+          type: "cc_encuestador",
+          value: cedula,
+        },
+      ];
     }
 
     // tiempos y coords final
