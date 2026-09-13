@@ -3,6 +3,7 @@ import { Router } from "express";
 import Encuesta from "../models/Encuesta.js";
 import Usuario from "../models/Usuario.js";
 import { buildRespuestasCsv, buildRespuestasXlsx } from "../utils/exportRespuestas.js";
+import { buildEstadisticas } from "../utils/estadisticas.js";
 
 const router = Router();
 
@@ -467,6 +468,37 @@ router.get("/seguimiento/xlsx", async (req, res) => {
   } catch (e) {
     console.error("Error xlsx seguimiento:", e);
     return res.status(500).json({ error: "No se pudo generar el Excel" });
+  }
+});
+
+// GET /api/encuestas/seguimiento/estadisticas
+router.get("/seguimiento/estadisticas", async (req, res) => {
+  try {
+    if (!(await requireSeguimiento(req, res))) return;
+    let rango;
+    try {
+      rango = rangoFechasBogota(req.query.desde || PRPD_DESDE, req.query.hasta);
+    } catch (e) {
+      return res.status(e.status || 400).json({ error: e.message });
+    }
+    const filtro = filtroPrpdRango(rango.start, rango.end);
+    if (req.query.pruebas !== "1") {
+      filtro.isTest = { $ne: true };
+    }
+    const docs = await Encuesta.find(filtro)
+      .select("code tipo isTest startedAt finishedAt createdAt answeredCount respuestas")
+      .sort({ startedAt: 1, createdAt: 1 })
+      .lean();
+    return res.json({
+      ok: true,
+      desde: rango.desde,
+      hasta: rango.hasta,
+      pruebas: req.query.pruebas === "1",
+      ...buildEstadisticas(docs),
+    });
+  } catch (e) {
+    console.error("Error estadisticas seguimiento:", e);
+    return res.status(500).json({ error: "No se pudieron calcular las estadísticas" });
   }
 });
 

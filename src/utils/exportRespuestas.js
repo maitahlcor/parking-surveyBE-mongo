@@ -15,9 +15,10 @@ const META = [
 
 const META_KEYS = META.map((m) => m.key);
 
-const questions = JSON.parse(
+export const PREGUNTAS = JSON.parse(
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../data/preguntasUsuarios.json"), "utf8")
 );
+const questions = PREGUNTAS;
 
 const byName = new Map(questions.map((q) => [String(q.name), q]));
 
