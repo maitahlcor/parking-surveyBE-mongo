@@ -128,10 +128,10 @@
     "isRequired": true,
     "type": "radiogroup",
     "choices": [
-      "AUTO",
-      "MOTO",
-      "BUS",
-      "TAXI"
+      { "value": "AUTO", "text": "Carro" },
+      { "value": "MOTO", "text": "Moto" },
+      { "value": "BUS", "text": "Bus" },
+      { "value": "TAXI", "text": "Taxi" }
     ],
     "output": "modo_actual",
     "rule": "TAXI=>SIN_PD_MODAL_CONTINUAR_POST_PD",
@@ -254,23 +254,23 @@
   {
     "name": 11,
     "codigo": "PR08",
-    "title": "Para completar este viaje, ¿cuántas veces necesita cambiar de vehículo o servicio de transporte? (veces)",
+    "title": "Para completar este viaje, ¿cuántas veces necesita cambiar de vehículo o servicio de transporte?",
     "isRequired": true,
     "type": "radiogroup",
     "choices": [
-      "0",
-      "1",
-      "2",
-      "3+"
+      { "value": "0", "text": "0 — Voy directo, no cambio" },
+      { "value": "1", "text": "1 — Cambio una vez" },
+      { "value": "2", "text": "2 — Cambio dos veces" },
+      { "value": "3+", "text": "3 o más cambios" }
     ],
     "output": "cambios_actuales",
     "orden": [
       {
         "tipo": "Estado inicial",
-        "orden": 9
+        "orden": 10
       }
     ],
-    "description": "Cuente un cambio cuando debe bajarse de un vehículo o servicio y continuar en otro."
+    "description": "Si va directo, sin bajarse a tomar otro vehículo o servicio, elija 0. Si se baja una vez y continúa en otro, elija 1. Cuente cada cambio."
   },
   {
     "name": 12,
@@ -290,7 +290,7 @@
     "orden": [
       {
         "tipo": "Estado inicial",
-        "orden": 10
+        "orden": 9
       }
     ]
   },
@@ -418,8 +418,8 @@
     "isRequired": true,
     "type": "radiogroup",
     "choices": [
-      "Agropecuario/finca",
-      "Agroindustrial/bananero",
+      "Agropecuario/finca/bananero",
+      "Agroindustrial",
       "Comercio",
       "Transporte",
       "Servicios",
@@ -576,10 +576,22 @@
     ]
   },
   {
+    "name": "likert_intro",
+    "codigo": "COM00",
+    "title": "Ahora piense en lo que usted valora normalmente cuando viaja. No piense específicamente en el sistema que acaba de ver; responda según sus preferencias habituales. Use la escala de 1 (Totalmente en desacuerdo) a 7 (Totalmente de acuerdo).",
+    "isRequired": false,
+    "type": "intro",
+    "orden": [
+      {
+        "tipo": "Comodidad",
+        "orden": 21.5
+      }
+    ]
+  },
+  {
     "name": "COM01",
     "codigo": "COM01",
     "title": "Para mí es importante contar con suficiente espacio durante el viaje.",
-    "description": "Ahora piense en lo que usted valora normalmente cuando viaja. No piense específicamente en el sistema que acaba de ver; responda según sus preferencias habituales. Use la escala de 1 (Totalmente en desacuerdo) a 7 (Totalmente de acuerdo).",
     "isRequired": true,
     "type": "likert",
     "layout": "vertical",
@@ -824,7 +836,7 @@
   {
     "name": "COM06",
     "codigo": "COM06",
-    "title": "Para viajes como este, las condiciones dentro del vehículo me importan poco si puedo llegar al destino.",
+    "title": "En viajes como este, llegar al destino es más importante para mí que las condiciones dentro del vehículo.",
     "isRequired": true,
     "type": "likert",
     "layout": "vertical",
