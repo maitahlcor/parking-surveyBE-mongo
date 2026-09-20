@@ -25,7 +25,9 @@
       "Necoclí – cabecera",
       "San Pedro – cabecera",
       "San Juan – cabecera",
-      "Arboletes – cabecera"
+      "Arboletes – cabecera",
+      "Caucheras",
+      "Bajirá (Brisas, Murindó, Riosucio y Vigía del Fuerte)"
     ],
     "output": "origen_id",
     "orden": [
@@ -62,7 +64,9 @@
       "Necoclí – cabecera",
       "San Pedro – cabecera",
       "San Juan – cabecera",
-      "Arboletes – cabecera"
+      "Arboletes – cabecera",
+      "Caucheras",
+      "Bajirá (Brisas, Murindó, Riosucio y Vigía del Fuerte)"
     ],
     "output": "destino_id",
     "orden": [
